@@ -18,21 +18,29 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/lavagetto/xkcli/database"
 	"github.com/spf13/cobra"
 )
 
 // searchCmd represents the search command
 var searchCmd = &cobra.Command{
 	Use:   "search",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Search XKCD strips",
+	Long: `Search the xkcd database for a string:
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Don't forget to quote your query on the shell.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("search called")
+		fmt.Println("Your search results:")
+		db, err := database.Open("xkcd.bleve")
+		defer db.Close()
+		if err != nil {
+			panic(err)
+		}
+		searchResult, err := database.SearchStr(db, args[0], nil)
+		for pos, result := range searchResult.Hits {
+			strip := database.NewStripFromDb(result)
+			fmt.Printf("%d - (%.2f) %s", pos, result.Score, strip.Summary())
+		}
 	},
 }
 

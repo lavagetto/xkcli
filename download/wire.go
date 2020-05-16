@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"time"
-
-	"github.com/blevesearch/bleve"
 )
 
 // WireXKCD contains all the data and metadata about an XKCD strip you can get
@@ -16,10 +14,13 @@ type WireXKCD struct {
 	ID int `json:"num"`
 
 	// The title of the strip
-	Title string
+	Title string `json:"safe_title"`
 
 	// The URL of the image for the strip
 	Img string `json:"img"`
+
+	// The alternative text
+	Alt string `json:"alt"`
 
 	// The transcript of the strip
 	Transcript string
@@ -34,6 +35,9 @@ type WireXKCD struct {
 	Year  int `json:"year,string"`
 	Day   int `json:"day,string"`
 	Month int `json:"month,string"`
+
+	// Store the date information in a dedicated field
+	DateTime time.Time `json:"date"`
 }
 
 // NewFromWire creates a new struct based on the json data coming from the server.
@@ -44,6 +48,10 @@ func NewFromWire(r io.Reader) (*WireXKCD, error) {
 	if err != nil {
 		logger.Debugw("Error decoding the server response", "error", err)
 		return nil, err
+	}
+	w.DateTime, err = w.GetTime()
+	if err != nil {
+		w.DateTime = time.Time{}
 	}
 	return &w, nil
 }
@@ -56,18 +64,4 @@ func (w WireXKCD) GetTime() (time.Time, error) {
 // Date returns a string representation of the date of the strip
 func (w WireXKCD) Date() string {
 	return fmt.Sprintf("%d-%02d-%02d", w.Year, w.Month, w.Day)
-}
-
-// Summary offers a formatted output.
-func (w WireXKCD) Summary() string {
-	return fmt.Sprintf("XKCD %d (%s): %s\n\tstrip: %s\n", w.ID, w.Date(), w.Title, w.Img)
-}
-
-// Index performs the indexing of this resource in a bleve index.
-func (w *WireXKCD) Index(idx bleve.Index) error {
-	err := idx.Index(w.Title, w)
-	if err != nil {
-		logger.Errorw("Error indexing", "id", w.ID, "error", err.Error())
-	}
-	return err
 }
