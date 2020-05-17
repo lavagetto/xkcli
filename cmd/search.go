@@ -18,21 +18,38 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/spf13/viper"
+
+	"github.com/lavagetto/xkcli/database"
 	"github.com/spf13/cobra"
 )
 
 // searchCmd represents the search command
 var searchCmd = &cobra.Command{
 	Use:   "search",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Search XKCD strips",
+	Long: `Search the xkcd database for a string:
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Don't forget to quote your query on the shell.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("search called")
+		dbPath := viper.GetString("dbPath")
+		minScore := viper.GetFloat64("minScore")
+		db, err := database.Open(dbPath)
+		defer db.Close()
+		if err != nil {
+			panic(err)
+		}
+		searchResult, err := database.SearchStr(db, args[0], nil)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Your search results:")
+		for pos, result := range searchResult.Hits {
+			if result.Score > minScore {
+				strip := database.NewStripFromDb(result)
+				fmt.Printf("%d - (%.2f) %s", pos, result.Score, strip.Summary())
+			}
+		}
 	},
 }
 

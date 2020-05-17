@@ -21,6 +21,7 @@ import (
 	"github.com/lavagetto/xkcli/database"
 	"github.com/lavagetto/xkcli/download"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // refreshCmd represents the refresh command
@@ -30,13 +31,17 @@ var refreshCmd = &cobra.Command{
 	Long: `xkcli refresh will refresh the local database of strips, 
 fetching all the  relative metadata.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		dbPath := viper.GetString("dbPath")
 		logger := setupLogging(debugLog).Sugar()
 		defer logger.Sync()
 		download.SetLogger(logger)
+		database.SetLogger(logger)
+		// the waitgroup is used to wait for all the goroutines to be done.
+		var wg sync.WaitGroup
 		logger.Debug("Showing logs at debug level")
-		db, err := database.Open("xkcd.bleve", logger)
+		db, err := database.Open(dbPath)
 		if err != nil {
-			logger.Fatalw("Unable to open the database", "error", err)
+			logger.Fatalw("Unable to open the database", "path", dbPath, "error", err)
 		}
 		defer db.Close()
 		// Setup the download manager
@@ -48,20 +53,39 @@ fetching all the  relative metadata.`,
 			Ua:  ua,
 		}
 		defer mgr.Close()
+		// Get the max number of records to download
+		maxRecords, _ := cmd.Flags().GetInt("maxRecords")
+
+		// Determine which strips to download. We will start from the highest-id
+		// strip we have, and add maxRecords new strips.
+		logger.Debug("Fetching the most recent ID in the database.")
+		lastInDb := database.GetLatestID(db)
+		logger.Debugf("Maximum doc ID found: %d", lastInDb)
+		maxID := maxRecords + lastInDb
 		logger.Debug("Fetching the latest ID")
 		latest := mgr.GetLatestID()
 		logger.Debugf("Max id is %d", latest)
-		var wg sync.WaitGroup
-		for id := 1; id <= latest; id++ {
+		if latest < maxID || maxRecords == 0 {
+			maxID = latest
+		}
+		if lastInDb >= maxID {
+			logger.Info("Nothing to download")
+			return
+		}
+		logger.Infow("Downloading strips", "from", lastInDb+1, "to", maxID)
+
+		// download and index data
+		for id := (lastInDb + 1); id <= maxID; id++ {
 			logger.Debugf("Scheduling download of id %d", id)
 			wg.Add(1)
 			go func(i int, wg *sync.WaitGroup) {
 				defer wg.Done()
 				w := mgr.Get(i)
 				if w != nil {
-					err := w.Index(db)
+					doc := database.NewStrip(w)
+					err := doc.Index(db)
 					if err == nil {
-						logger.Infof("Indexed strip %s", w.Summary())
+						logger.Infof("Indexed strip %s", doc.Summary())
 					}
 				}
 			}(id, &wg)
@@ -84,4 +108,5 @@ func init() {
 	// refreshCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	refreshCmd.Flags().IntP("concurrency", "c", 1, "Number of parallel threads to launch to download missing strips")
 	refreshCmd.Flags().StringP("userAgent", "u", "XKCD-cli Crawler/1.0.0", "The user-agent to use when downloading the contents.")
+	refreshCmd.Flags().IntP("maxRecords", "m", 0, "Maximum number of records to retreive. By default unbounded.")
 }
