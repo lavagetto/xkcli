@@ -80,6 +80,11 @@ func (x XKCDStrip) Summary() string {
 	return fmt.Sprintf("XKCD %d (%s): %s\n\tstrip: %s\n", x.ID, x.Date, x.Title, x.Img)
 }
 
+// URL returns the full url of a strip
+func (x XKCDStrip) URL() string {
+	return fmt.Sprintf("https://xkcd.com/%d", x.ID)
+}
+
 var allFields = []string{"title", "id", "img", "comment", "transcript", "date"}
 
 // DocMapping returns a bleve document mapping suitable to store this object

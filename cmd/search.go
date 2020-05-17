@@ -17,7 +17,9 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/blevesearch/bleve/search"
 	"github.com/spf13/viper"
 
 	"github.com/lavagetto/xkcli/database"
@@ -34,21 +36,44 @@ Don't forget to quote your query on the shell.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		dbPath := viper.GetString("dbPath")
 		minScore := viper.GetFloat64("minScore")
-		db, err := database.Open(dbPath)
-		defer db.Close()
+		doFeelLucky, err := cmd.Flags().GetBool("lucky")
 		if err != nil {
 			panic(err)
 		}
+		db, err := database.Open(dbPath)
+		if err != nil {
+			panic(err)
+		}
+		defer db.Close()
 		searchResult, err := database.SearchStr(db, args[0], nil)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("Your search results:")
-		for pos, result := range searchResult.Hits {
-			if result.Score > minScore {
-				strip := database.NewStripFromDb(result)
-				fmt.Printf("%d - (%.2f) %s", pos, result.Score, strip.Summary())
+		if searchResult.MaxScore < minScore {
+			fmt.Println("No result matching the query abouve minimum score")
+			os.Exit(1)
+		}
+		if doFeelLucky {
+			strip := database.NewStripFromDb(searchResult.Hits[0])
+			fmt.Println(strip.URL())
+			os.Exit(0)
+		}
+		skipped := 0
+		var validResults []*search.DocumentMatch
+		for _, result := range searchResult.Hits {
+			if result.Score >= minScore {
+				validResults = append(validResults, result)
+			} else {
+				skipped++
 			}
+		}
+		fmt.Println("Your search results:")
+		for pos, result := range validResults {
+			strip := database.NewStripFromDb(result)
+			fmt.Printf("%d - (%.2f) %s", pos, result.Score, strip.Summary())
+		}
+		if skipped > 0 {
+			fmt.Printf("We also found %d results below the threshold (%.2f)\n", skipped, minScore)
 		}
 	},
 }
@@ -65,4 +90,5 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// searchCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	searchCmd.Flags().BoolP("lucky", "l", false, "Return just the url of one result (for IRC usage).")
 }

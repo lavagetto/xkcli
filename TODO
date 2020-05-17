@@ -1,0 +1,12 @@
+
+SEARCH
+* Make the output of search start from 1, as humans expect
+* Allow the user to define via a flag the desired output format
+* Allow overriding the default summary format via configuration
+* Allow unquoted searches
+
+REFRESH
+* Do not just check the latest id when choosing what to download, 
+  also search missing strips
+* Allow force-refreshing an existing index (for downloading new 
+  info - transcripts are not always there for newer strips).
