@@ -18,6 +18,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/spf13/viper"
+
 	"github.com/lavagetto/xkcli/database"
 	"github.com/spf13/cobra"
 )
@@ -30,16 +32,23 @@ var searchCmd = &cobra.Command{
 
 Don't forget to quote your query on the shell.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Your search results:")
-		db, err := database.Open("xkcd.bleve")
+		dbPath := viper.GetString("dbPath")
+		minScore := viper.GetFloat64("minScore")
+		db, err := database.Open(dbPath)
 		defer db.Close()
 		if err != nil {
 			panic(err)
 		}
 		searchResult, err := database.SearchStr(db, args[0], nil)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Your search results:")
 		for pos, result := range searchResult.Hits {
-			strip := database.NewStripFromDb(result)
-			fmt.Printf("%d - (%.2f) %s", pos, result.Score, strip.Summary())
+			if result.Score > minScore {
+				strip := database.NewStripFromDb(result)
+				fmt.Printf("%d - (%.2f) %s", pos, result.Score, strip.Summary())
+			}
 		}
 	},
 }

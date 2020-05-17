@@ -21,6 +21,7 @@ import (
 	"github.com/lavagetto/xkcli/database"
 	"github.com/lavagetto/xkcli/download"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // refreshCmd represents the refresh command
@@ -30,6 +31,7 @@ var refreshCmd = &cobra.Command{
 	Long: `xkcli refresh will refresh the local database of strips, 
 fetching all the  relative metadata.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		dbPath := viper.GetString("dbPath")
 		logger := setupLogging(debugLog).Sugar()
 		defer logger.Sync()
 		download.SetLogger(logger)
@@ -37,9 +39,9 @@ fetching all the  relative metadata.`,
 		// the waitgroup is used to wait for all the goroutines to be done.
 		var wg sync.WaitGroup
 		logger.Debug("Showing logs at debug level")
-		db, err := database.Open("xkcd.bleve")
+		db, err := database.Open(dbPath)
 		if err != nil {
-			logger.Fatalw("Unable to open the database", "error", err)
+			logger.Fatalw("Unable to open the database", "path", dbPath, "error", err)
 		}
 		defer db.Close()
 		// Setup the download manager
@@ -67,7 +69,7 @@ fetching all the  relative metadata.`,
 			maxID = latest
 		}
 		if lastInDb >= maxID {
-			logger.Info("Noting to download")
+			logger.Info("Nothing to download")
 			return
 		}
 		logger.Infow("Downloading strips", "from", lastInDb+1, "to", maxID)
