@@ -8,8 +8,9 @@ import (
 var logger *zap.SugaredLogger
 
 type SearchOpts struct {
-	Fields []string
-	SortBy []string
+	Fields     []string
+	SortBy     []string
+	MaxRecords int
 }
 
 func (s SearchOpts) Apply(request *bleve.SearchRequest) {
@@ -18,6 +19,9 @@ func (s SearchOpts) Apply(request *bleve.SearchRequest) {
 	}
 	if s.SortBy != nil {
 		request.SortBy(s.SortBy)
+	}
+	if s.MaxRecords != 0 {
+		request.Size = s.MaxRecords
 	}
 }
 
@@ -60,6 +64,21 @@ func GetLatestID(idx bleve.Index) int {
 	}
 	maxidFloat := allRecords.Hits[0].Fields["id"].(float64)
 	return int(maxidFloat)
+}
+
+// GetAllIDs will return a list of IDs of all strips that have been downloaded.
+func GetAllIDs(idx bleve.Index, maxID int) map[int]bool {
+	allRecords, err := GetAll(idx, &SearchOpts{Fields: []string{"id"}, MaxRecords: maxID, SortBy: []string{"id"}})
+	if err != nil {
+		logger.Errorw("Could not retreive all data from the datastore", "error", err)
+		return make(map[int]bool)
+	}
+	results := make(map[int]bool, allRecords.Total)
+	for _, record := range allRecords.Hits {
+		id := int(record.Fields["id"].(float64))
+		results[id] = true
+	}
+	return results
 }
 
 // SearchStr will perform a string query on the datastore
