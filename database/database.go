@@ -54,7 +54,8 @@ func GetAll(idx bleve.Index, opts *SearchOpts) (*bleve.SearchResult, error) {
 
 // GetLatestID returns the highest ID recorded in the database
 func GetLatestID(idx bleve.Index) int {
-	allRecords, err := GetAll(idx, &SearchOpts{Fields: []string{"id"}, SortBy: []string{"-id"}})
+	// Note: we're limiting to 1 result because that's all we need.
+	allRecords, err := GetAll(idx, &SearchOpts{MaxRecords: 1, SortBy: []string{"-id"}})
 	if err != nil {
 		logger.Errorw("Could not retreive all data from the datastore", "error", err)
 		return 0
@@ -62,21 +63,28 @@ func GetLatestID(idx bleve.Index) int {
 	if allRecords.Total == 0 {
 		return 0
 	}
-	maxidFloat := allRecords.Hits[0].Fields["id"].(float64)
-	return int(maxidFloat)
+	latest := NewStripFromDb(allRecords.Hits[0])
+	// If errors occur getting the document from the database, we just return 0
+	// as we assume the database is corrupted.
+	if latest == nil {
+		return 0
+	}
+	return latest.ID
 }
 
-// GetAllIDs will return a list of IDs of all strips that have been downloaded.
+// GetAllIDs will return a list of IDs of all strips that have been downloaded, up to maxID.
 func GetAllIDs(idx bleve.Index, maxID int) map[int]bool {
-	allRecords, err := GetAll(idx, &SearchOpts{Fields: []string{"id"}, MaxRecords: maxID, SortBy: []string{"id"}})
+	allRecords, err := GetAll(idx, &SearchOpts{MaxRecords: maxID, SortBy: []string{"id"}})
 	if err != nil {
 		logger.Errorw("Could not retreive all data from the datastore", "error", err)
 		return make(map[int]bool)
 	}
 	results := make(map[int]bool, allRecords.Total)
 	for _, record := range allRecords.Hits {
-		id := int(record.Fields["id"].(float64))
-		results[id] = true
+		strip := NewStripFromDb(record)
+		if strip != nil {
+			results[strip.ID] = true
+		}
 	}
 	return results
 }

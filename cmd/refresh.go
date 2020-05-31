@@ -24,6 +24,10 @@ import (
 	"github.com/spf13/viper"
 )
 
+var idToSkip = map[int]string{
+	404: "This strip is not found on purpose",
+}
+
 // refreshCmd represents the refresh command
 var refreshCmd = &cobra.Command{
 	Use:   "refresh",
@@ -72,6 +76,10 @@ fetching all the  relative metadata.`,
 		existingIDs := database.GetAllIDs(db, latest)
 		for i := 1; i <= latest; i++ {
 			if _, ok := existingIDs[i]; ok {
+				continue
+			}
+			if reason, ok := idToSkip[i]; ok {
+				logger.Debugw("Skipping strip", "id", i, "reason", reason)
 				continue
 			}
 			toDownload = append(toDownload, i)

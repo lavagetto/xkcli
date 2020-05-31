@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/blevesearch/bleve"
@@ -36,10 +37,12 @@ func NewStrip(w *download.WireXKCD) *XKCDStrip {
 
 // NewStripFromDb returns an xkcd strip from data recovered from the database.
 func NewStripFromDb(result *search.DocumentMatch) *XKCDStrip {
-	strip := XKCDStrip{Title: result.ID}
-	if id, ok := result.Fields["id"]; ok {
-		strip.ID = int(id.(float64))
+	id, err := strconv.Atoi(result.ID)
+	if err != nil {
+		logger.Errorw("Non-numeric ID found", "error", err)
+		return nil
 	}
+	strip := XKCDStrip{ID: id}
 	if datetime, ok := result.Fields["date"]; ok {
 		// This is funnily stored as a full RFC3339 time string
 		t, err := time.Parse(time.RFC3339, datetime.(string))
@@ -49,6 +52,9 @@ func NewStripFromDb(result *search.DocumentMatch) *XKCDStrip {
 	}
 	// This is verbose for code readability. Resist the temptation
 	// of making this code shorter by 2 lines.
+	if title, ok := result.Fields["title"]; ok {
+		strip.Title = title.(string)
+	}
 	if comment, ok := result.Fields["comment"]; ok {
 		strip.Comment = comment.(string)
 	}
@@ -68,7 +74,7 @@ func (x *XKCDStrip) BleveType() string {
 
 // Index performs the indexing of this resource in a bleve index.
 func (x *XKCDStrip) Index(idx bleve.Index) error {
-	err := idx.Index(x.Title, x)
+	err := idx.Index(strconv.Itoa(x.ID), x)
 	if err != nil {
 		logger.Errorw("Error indexing", "id", x.ID, "error", err.Error())
 	}
@@ -93,8 +99,8 @@ func DocMapping() *mapping.DocumentMapping {
 	docmap := bleve.NewDocumentMapping()
 	title := bleve.NewTextFieldMapping()
 	docmap.AddFieldMappingsAt("title", title)
+	title.Store = true
 	id := bleve.NewNumericFieldMapping()
-	id.Store = true
 	docmap.AddFieldMappingsAt("id", id)
 	for _, label := range []string{"img", "comment", "transcript"} {
 		fm := bleve.NewTextFieldMapping()

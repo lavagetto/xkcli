@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strconv"
 	"testing"
 
 	"github.com/blevesearch/bleve"
@@ -31,7 +32,7 @@ func setup() {
 			Date:    fmt.Sprintf("2020-01-%02d", i),
 			Comment: fmt.Sprintf("Comment #%d", i),
 		}
-		fixturedb.Index(strip.Title, strip)
+		fixturedb.Index(strconv.Itoa(strip.ID), strip)
 	}
 }
 
