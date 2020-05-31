@@ -89,7 +89,6 @@ func initConfig() {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-
 		// Search config in home directory with name ".xkcli" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigName(".xkcli")

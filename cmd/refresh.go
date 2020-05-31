@@ -24,6 +24,10 @@ import (
 	"github.com/spf13/viper"
 )
 
+var idToSkip = map[int]string{
+	404: "This strip is not found on purpose",
+}
+
 // refreshCmd represents the refresh command
 var refreshCmd = &cobra.Command{
 	Use:   "refresh",
@@ -60,22 +64,37 @@ fetching all the  relative metadata.`,
 		// strip we have, and add maxRecords new strips.
 		logger.Debug("Fetching the most recent ID in the database.")
 		lastInDb := database.GetLatestID(db)
-		logger.Debugf("Maximum doc ID found: %d", lastInDb)
-		maxID := maxRecords + lastInDb
+		logger.Debugf("Maximum stored ID found: %d", lastInDb)
 		logger.Debug("Fetching the latest ID")
 		latest := mgr.GetLatestID()
-		logger.Debugf("Max id is %d", latest)
-		if latest < maxID || maxRecords == 0 {
-			maxID = latest
+		if maxRecords == 0 {
+			maxRecords = latest
 		}
-		if lastInDb >= maxID {
+		logger.Debugf("Max id is %d", latest)
+		toDownload := make([]int, 0)
+		// Now search for missing strips in the database
+		existingIDs := database.GetAllIDs(db, latest)
+		for i := 1; i <= latest; i++ {
+			if _, ok := existingIDs[i]; ok {
+				continue
+			}
+			if reason, ok := idToSkip[i]; ok {
+				logger.Debugw("Skipping strip", "id", i, "reason", reason)
+				continue
+			}
+			toDownload = append(toDownload, i)
+			if len(toDownload) >= maxRecords {
+				break
+			}
+		}
+		if len(toDownload) == 0 {
 			logger.Info("Nothing to download")
 			return
 		}
-		logger.Infow("Downloading strips", "from", lastInDb+1, "to", maxID)
+		logger.Info("Downloading strips")
 
 		// download and index data
-		for id := (lastInDb + 1); id <= maxID; id++ {
+		for _, id := range toDownload {
 			logger.Debugf("Scheduling download of id %d", id)
 			wg.Add(1)
 			go func(i int, wg *sync.WaitGroup) {

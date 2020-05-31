@@ -50,7 +50,7 @@ func (d *Manager) Get(Id int) *WireXKCD {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode > 399 {
-		logger.Errorw("Error response from server", "id", Id, "code", resp.Status)
+		logger.Errorw("Error response from server", "strip", fullURL, "code", resp.Status)
 		return nil
 	}
 	wire, err := NewFromWire(resp.Body)
