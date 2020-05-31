@@ -70,7 +70,7 @@ Don't forget to quote your query on the shell.`,
 		fmt.Println("Your search results:")
 		for pos, result := range validResults {
 			strip := database.NewStripFromDb(result)
-			fmt.Printf("%d - (%.2f) %s", pos, result.Score, strip.Summary())
+			fmt.Printf("%d - (%.2f) %s", pos+1, result.Score, strip.Summary())
 		}
 		if skipped > 0 {
 			fmt.Printf("We also found %d results below the threshold (%.2f)\n", skipped, minScore)
